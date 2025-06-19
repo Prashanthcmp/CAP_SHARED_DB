@@ -1,0 +1,140 @@
+_schema-version: 3.3.0
+ID: zcap_demo_1
+description: A simple CAP project.
+version: 1.0.0
+modules:
+  - name: zcap_demo_1-srv
+    type: nodejs
+    path: gen/srv
+    requires:
+      - name: ZCAP-db
+      - name: uaa_zcap_demo_1
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    parameters:
+      buildpack: nodejs_buildpack
+      instances: 1
+    build-parameters:
+      builder: npm-ci
+  - name: ZCAP-db-deployer
+    type: hdb
+    path: gen/db
+    requires:
+      - name: ZCAP-db
+    parameters:
+      buildpack: nodejs_buildpack
+  - name: zcap_demo_1-destination-content
+    type: com.sap.application.content
+    requires:
+      - name: zcap_demo_1-destination-service
+        parameters:
+          content-target: true
+      - name: zcap_demo_1_html_repo_host
+        parameters:
+          service-key:
+            name: zcap_demo_1_html_repo_host-key
+      - name: uaa_zcap_demo_1
+        parameters:
+          service-key:
+            name: uaa_zcap_demo_1-key
+    parameters:
+      content:
+        instance:
+          destinations:
+            - Name: zcap_demo_1_zcap_demo_1_html_repo_host
+              ServiceInstanceName: zcap_demo_1-html5-app-host-service
+              ServiceKeyName: zcap_demo_1_html_repo_host-key
+              sap.cloud.service: zcap_demo_1
+            - Authentication: OAuth2UserTokenExchange
+              Name: zcap_demo_1_uaa_zcap_demo_1
+              ServiceInstanceName: zcap_demo_1-xsuaa-service
+              ServiceKeyName: uaa_zcap_demo_1-key
+              sap.cloud.service: zcap_demo_1
+          existing_destinations_policy: ignore
+    build-parameters:
+      no-source: true
+  - name: zcap_demo_1-app-content
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: zcap_demo_1_html_repo_host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - artifacts:
+            - zdemocap1.zip
+          name: zdemocap1
+          target-path: resources/
+  - name: zdemocap1
+    type: html5
+    path: app/zdemo_cap_1
+    build-parameters:
+      build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build:cf
+      supported-platforms:
+        []
+resources:
+  - name: ZCAP-db
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+  - name: zcap_demo_1-destination-service
+    type: org.cloudfoundry.managed-service
+    parameters:
+      config:
+        HTML5Runtime_enabled: true
+        init_data:
+          instance:
+            destinations:
+              - Authentication: NoAuthentication
+                Name: ui5
+                ProxyType: Internet
+                Type: HTTP
+                URL: https://ui5.sap.com
+              - Authentication: NoAuthentication
+                HTML5.DynamicDestination: true
+                HTML5.ForwardAuthToken: true
+                Name: zcap_demo_1-srv-api
+                ProxyType: Internet
+                Type: HTTP
+                URL: ~{srv-api/srv-url}
+            existing_destinations_policy: update
+        version: 1.0.0
+      service: destination
+      service-name: zcap_demo_1-destination-service
+      service-plan: lite
+    requires:
+    - name: srv-api
+  - name: zcap_demo_1_html_repo_host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-name: zcap_demo_1-html5-app-host-service
+      service-plan: app-host
+  - name: uaa_zcap_demo_1
+    type: org.cloudfoundry.managed-service
+    parameters:
+      path: ./xs-security.json
+      service: xsuaa
+      service-name: zcap_demo_1-xsuaa-service
+      service-plan: application
+      config:
+        xsappname: zcap_demo_1-${org}-${space}
+        tenant-mode: dedicated
+parameters:
+  deploy_mode: html5-repo
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production

@@ -1,0 +1,12 @@
+{
+    "MY_BOOKSHOP_USER": {
+        "target": {
+            "object": "MY_PRODUCTPURCHASE_USER"
+        }
+    },
+    "MY_BOOKSHOP_PRODUCTCATEGORY": {
+        "target": {
+            "object": "MY_PRODUCTPURCHASE_PRODUCTCATEGORY"
+        }
+    }
+}
